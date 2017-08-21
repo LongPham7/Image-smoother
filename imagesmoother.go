@@ -8,29 +8,33 @@ import (
 const height = 50
 const width = 30
 
-var image1 [height][width]bool
-var image2 [height][width]bool
+var image [][]bool
+var auxiliaryImage [][]bool
 
 func initialize() {
+	image = make([][]bool, height)
+	auxiliaryImage = make([][]bool, height)
 	rand.Seed(10)
-	for i := 0; i != height; i++ {
-		for j := 0; j != width; j++ {
+	for r := 0; r != height; r++ {
+		image[r] = make([]bool, width)
+		auxiliaryImage[r] = make([]bool, width)
+		for c := 0; c != width; c++ {
 			if rand.Intn(50) > 14 {
-				image1[i][j] = true
+				image[r][c] = true
 			}
 		}
 	}
 }
 
-func printImage() {
-	for i := 0; i != height; i++ {
-		printRow(i)
+func printImage(image [][]bool) {
+	for r := 0; r != len(image); r++ {
+		printRow(image, r)
 	}
 }
 
-func printRow(i int) {
-	for j := 0; j != width; j++ {
-		if image1[i][j] {
+func printRow(image [][]bool, r int) {
+	for c := 0; c != len(image[r]); c++ {
+		if image[r][c] {
 			fmt.Print("*")
 		} else {
 			fmt.Print(" ")
@@ -84,7 +88,7 @@ func smoothBlock(start int, length int, in, out chan bool) bool {
 
 	for i := start; i != start+length; i++ {
 		for j := 0; j != width; j++ {
-			image2[i][j] = calculateMajority1(i, j)
+			auxiliaryImage[i][j] = calculateMajority(image, i, j)
 		}
 	}
 
@@ -93,72 +97,43 @@ func smoothBlock(start int, length int, in, out chan bool) bool {
 
 	for i := start; i != start+length; i++ {
 		for j := 0; j != width; j++ {
-			p = calculateMajority2(i, j)
-			if p != image1[i][j] {
+			p = calculateMajority(auxiliaryImage, i, j)
+			if p != image[i][j] {
 				nochange = false
 			}
-			image1[i][j] = p
+			image[i][j] = p
 		}
 	}
 	return nochange
 }
 
-func calculateMajority1(r, c int) bool {
+func calculateMajority(image [][]bool, r, c int) bool {
 	total := 0
 	count := 0
 	for i := -1; i != 2; i++ {
 		for j := -1; j != 2; j++ {
 			if 0 <= r+i && r+i < height && 0 <= c+j && c+j < width {
 				total++
-				if image1[r+i][c+j] {
+				if image[r+i][c+j] {
 					count++
 				}
 			}
 		}
 	}
 	total--
-	if image1[r][c] {
+	if image[r][c] {
 		count--
 	}
 
-	return majority(count, total)
-}
-
-func calculateMajority2(r, c int) bool {
-	total := 0
-	count := 0
-	for i := -1; i != 2; i++ {
-		for j := -1; j != 2; j++ {
-			if 0 <= r+i && r+i < height && 0 <= c+j && c+j < width {
-				total++
-				if image2[r+i][c+j] {
-					count++
-				}
-			}
-		}
-	}
-	total--
-	if image2[r][c] {
-		count--
-	}
-
-	return majority(count, total)
+	return count > total / 2
 }
 
 func main() {
 	initialize()
 	fmt.Println("The original image:")
-	printImage()
+	printImage(image)
 	fmt.Println("")
 	system(3)
 	fmt.Println("The new image:")
-	printImage()
-}
-
-func majority(x, y int) bool {
-	if y%2 == 0 {
-		return x > y / 2
-	} else {
-		return x > y / 2
-	}
+	printImage(image)
 }
