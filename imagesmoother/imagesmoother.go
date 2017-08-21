@@ -7,6 +7,7 @@ import (
 
 const height = 50
 const width = 30
+const seed = 42
 
 var image [][]bool
 var auxiliaryImage [][]bool
@@ -14,7 +15,7 @@ var auxiliaryImage [][]bool
 func initialize() {
 	image = make([][]bool, height)
 	auxiliaryImage = make([][]bool, height)
-	rand.Seed(10)
+	rand.Seed(seed)
 	for r := 0; r != height; r++ {
 		image[r] = make([]bool, width)
 		auxiliaryImage[r] = make([]bool, width)
@@ -43,68 +44,65 @@ func printRow(image [][]bool, r int) {
 	fmt.Println()
 }
 
-func system(WORKER int) {
-	blockheight := height / WORKER
+func system(WORKERS int) {
+	blockheight := height / WORKERS
 	fromW := make(chan bool)
 	toW := make(chan bool)
-	for i := 0; i != WORKER; i++ {
+	for i := 0; i != WORKERS; i++ {
 		go worker(i*blockheight, blockheight, toW, fromW)
 	}
-	coordinate(WORKER, fromW, toW)
+	coordinator(WORKERS, fromW, toW)
 }
 
-func coordinate(WORKER int, in, out chan bool) {
-	var nochange bool = false
-	for !nochange {
-		nochange = true
-		for i := 0; i != WORKER; i++ {
-			input := <-in
-			nochange = nochange && input
+func coordinator(WORKERS int, in, out chan bool) {
+	noChange := false
+	for !noChange {
+		noChange = true
+		for i := 0; i != WORKERS; i++ {
+			noChange = <-in && noChange // For some reason, noChnage && <-in does not work.
 		}
-		if !nochange {
-			for i := 0; i != WORKER; i++ {
+		if !noChange {
+			for i := 0; i != WORKERS; i++ {
 				out <- true
 			}
 		}
 	}
-	for i := 0; i != WORKER; i++ {
+	for i := 0; i != WORKERS; i++ {
 		out <- false
 	}
 }
 
 func worker(start int, length int, in, out chan bool) {
-	var proceed bool = true
-	var change bool
+	proceed := true
 	for proceed {
-		change = smoothBlock(start, length, in, out)
-		out <- change
+		out <- smoothBlock(start, length, in, out)
 		proceed = <-in
 	}
 }
 
 func smoothBlock(start int, length int, in, out chan bool) bool {
-	nochange := true
-	p := false
+	noChange := true
+	majority := false
 
-	for i := start; i != start+length; i++ {
-		for j := 0; j != width; j++ {
-			auxiliaryImage[i][j] = calculateMajority(image, i, j)
+	for r := start; r != start+length; r++ {
+		for c := 0; c != width; c++ {
+			auxiliaryImage[r][c] = calculateMajority(image, r, c)
 		}
 	}
 
 	out <- false
 	<-in
 
-	for i := start; i != start+length; i++ {
-		for j := 0; j != width; j++ {
-			p = calculateMajority(auxiliaryImage, i, j)
-			if p != image[i][j] {
-				nochange = false
+	for r := start; r != start+length; r++ {
+		for c := 0; c != width; c++ {
+			majority = calculateMajority(auxiliaryImage, r, c)
+			if majority != image[r][c] {
+				noChange = false
 			}
-			image[i][j] = p
+			image[r][c] = majority
 		}
 	}
-	return nochange
+	return noChange
 }
 
 func calculateMajority(image [][]bool, r, c int) bool {
@@ -125,7 +123,7 @@ func calculateMajority(image [][]bool, r, c int) bool {
 		count--
 	}
 
-	return count > total / 2
+	return count > total/2
 }
 
 func main() {
@@ -133,7 +131,7 @@ func main() {
 	fmt.Println("The original image:")
 	printImage(image)
 	fmt.Println("")
-	system(3)
+	system(5)
 	fmt.Println("The new image:")
 	printImage(image)
 }
