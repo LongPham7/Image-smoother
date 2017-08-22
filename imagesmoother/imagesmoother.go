@@ -5,14 +5,14 @@ import (
 	"math/rand"
 )
 
-const height = 50
-const width = 30
-const seed = 42
+var height int
+var width int
 
 var image [][]bool
 var auxiliaryImage [][]bool
 
-func initialize() {
+// initialize initializes the image to be smoothed. 
+func initialize(seed int64) {
 	image = make([][]bool, height)
 	auxiliaryImage = make([][]bool, height)
 	rand.Seed(seed)
@@ -27,12 +27,15 @@ func initialize() {
 	}
 }
 
+// printImage displays the input image. 
 func printImage(image [][]bool) {
 	for r := 0; r != len(image); r++ {
 		printRow(image, r)
 	}
 }
 
+// printRow displays the r-th row of the input image. The indices
+// of rows are zero-based. 
 func printRow(image [][]bool, r int) {
 	for c := 0; c != len(image[r]); c++ {
 		if image[r][c] {
@@ -44,22 +47,36 @@ func printRow(image [][]bool, r int) {
 	fmt.Println()
 }
 
+// system executes a concurrent system consisting of one coordinator
+// and the given number of workers. 
 func system(WORKERS int) {
-	blockheight := height / WORKERS
+	var blockLowHeight int = height / WORKERS
+	blockHighHeight := blockLowHeight + 1
+	remainder := height % WORKERS
+	base := remainder * blockHighHeight
+
 	fromW := make(chan bool)
 	toW := make(chan bool)
-	for i := 0; i != WORKERS; i++ {
-		go worker(i*blockheight, blockheight, toW, fromW)
+
+	for i := 0; i != remainder; i++ {
+		go worker(i*blockHighHeight, blockHighHeight, toW, fromW)
+	}
+
+	for i := 0; i != WORKERS - remainder; i++ {
+		go worker(base + i*blockLowHeight, blockLowHeight, toW, fromW)
 	}
 	coordinator(WORKERS, fromW, toW)
 }
 
+// coordinator executes a coordinator process. 
 func coordinator(WORKERS int, in, out chan bool) {
 	noChange := false
+	input := false
 	for !noChange {
 		noChange = true
 		for i := 0; i != WORKERS; i++ {
-			noChange = <-in && noChange // For some reason, noChnage && <-in does not work.
+			input = <-in
+			noChange = input && noChange
 		}
 		if !noChange {
 			for i := 0; i != WORKERS; i++ {
@@ -72,6 +89,7 @@ func coordinator(WORKERS int, in, out chan bool) {
 	}
 }
 
+// worker executes a worker process. 
 func worker(start int, length int, in, out chan bool) {
 	proceed := true
 	for proceed {
@@ -80,6 +98,7 @@ func worker(start int, length int, in, out chan bool) {
 	}
 }
 
+// smoothBlock smoothes the specified block of an input image. 
 func smoothBlock(start int, length int, in, out chan bool) bool {
 	noChange := true
 	majority := false
@@ -105,6 +124,8 @@ func smoothBlock(start int, length int, in, out chan bool) bool {
 	return noChange
 }
 
+// calculateMajority returns the majority of the neighbours of the specified cell in
+// an input image. 
 func calculateMajority(image [][]bool, r, c int) bool {
 	total := 0
 	count := 0
@@ -127,7 +148,17 @@ func calculateMajority(image [][]bool, r, c int) bool {
 }
 
 func main() {
-	initialize()
+	var seed int64
+	fmt.Println("Please enter an integer to be used as a seed to generate random numbers:")
+	fmt.Scan(&seed)
+
+	fmt.Println("Please specify the height of an image:")
+	fmt.Scan(&height)
+
+	fmt.Println("Please specify the width of an image:")
+	fmt.Scan(&width)
+
+	initialize(seed)
 	fmt.Println("The original image:")
 	printImage(image)
 	fmt.Println("")
